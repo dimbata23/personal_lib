@@ -2,14 +2,14 @@
 # -*- coding: utf-8 -*-
 """ A script for extracting homeworks
 submitted to "Moodle educational system".
-Mainly targeting "Introduction to programming"
-course @ FMI, Sofia University 2019-2020.
+Mainly targeting the "OOP" course @ FMI,
+Sofia University 2019-2020.
 """
 
-__author__     = "Ivan Filipov"
-__version__    = "1.0.4"
-__maintainer__ = "Ivan Filipov"
-__email__      = "vanaka11.89@gmail.com"
+__author__     = "Ivan Filipov, Alexander Dimitrov"
+__version__    = "1.0.5"
+__maintainer__ = "Ivan Filipov, Alexander Dimitrov"
+__email__      = "vanaka11.89@gmail.com, adimitrov23@gmail.com"
 __status__     = "Production"
 
 import sys
@@ -44,14 +44,14 @@ SCOPES = ['https://www.googleapis.com/auth/spreadsheets.readonly']
 CREDENTIALS_FILE = "credentials.json"
 TOKEN_FILE       = "token.pickle"
 
-SPREADSHEET_ID = "1CgFx73YgVE8uRnUVS2q3TUc5Kl_N18_zFTtvZVUGgqc"
-NAMES_RANGE = "Sheet1!B205:B217"
-DATES_RANGE = "Sheet1!D198:R198"
-HW_RANGE    = "Sheet1!A4:R195"
+SPREADSHEET_ID = "1O4Ex9MakkeuUi6CnI5fdqG1iV9k8WESUbJqetahmpX0"
+NAMES_RANGE = "Sheet1!B204:B219"
+DATES_RANGE = "Sheet1!E200:J200"
+HW_RANGE    = "Sheet1!A5:J198"
 
-MY_NAME = "Иван Филипов" # CHANGE ME
-EASY_HW_BASE_OFFSET = 2
-HARD_HW_BASE_OFFSET = 12
+MY_NAME = "Александър Димитров" # CHANGE ME
+EASY_HW_BASE_OFFSET = 3
+HARD_HW_BASE_OFFSET = 5
 
 # ------------ Google spreadsheets related ------------
 
@@ -128,7 +128,7 @@ def get_data_from_google_drive(hw_num, is_easy):
     sheet = service.spreadsheets()
     clr = get_my_clr(sheet)
     hw_row_offset = EASY_HW_BASE_OFFSET if is_easy else HARD_HW_BASE_OFFSET
-    date_offset = hw_num if is_easy else hw_num + 10
+    date_offset = hw_num if is_easy else hw_num + HARD_HW_BASE_OFFSET - EASY_HW_BASE_OFFSET
     return get_students_ids_for_hw(clr, sheet, hw_num, hw_row_offset),\
            get_end_date(sheet, date_offset)
 
@@ -175,10 +175,13 @@ def process_zip_file(filename, my_students, end_date, out_dir):
 def drop_mid_name(name):
     """Get only first and last name of a student."""
     names = name.split(" ")
-    return names[0] + ' ' + names[2]
+    if len(names) == 3:
+        return names[0] + ' ' + names[2]
+    else:
+        return names[0] + ' ' + names[1]
 
 def ensure_dir_exists(dir_name):
-    """Create a directory if it is not existing."""
+    """Create a directory if it doesn't exist."""
     if not os.path.exists(dir_name):
         os.mkdir(dir_name)
 
@@ -188,8 +191,14 @@ def get_hw_num_and_type_from_zip_name(zip_file_name):
     """
     try:
         file_name = zip_file_name.lower()
-        is_easy = "леко" in file_name
-        hw_num  = int(re.search(r"C*(\d+)-\d+.zip", zip_file_name).group(1))
+        is_easy = not "проект" in file_name
+        if not is_easy:
+            hw_num = 1 if ("първия" in file_name) else (2 if ("втория" in file_name) else 0 )
+        else:
+            hw_num = 1 if ("първо" in file_name) else (2 if ("второ" in file_name) else 0)
+        if hw_num == 0:
+            print("Couldn't determine hw/project number.", file=sys.stderr)
+            sys.exit(5)
     except:
         print(zip_file_name + " does not look like moodle's zip file.", file=sys.stderr)
         sys.exit(3)
@@ -198,8 +207,8 @@ def get_hw_num_and_type_from_zip_name(zip_file_name):
 
 def format_output_dir_name(out_dir_name_root, hw_num, is_easy):
     """Create subdirectory name from given homework number and type."""
-    type_string = "easy" if is_easy else "hard"
-    formatted_subdir = "%02d_hw_%s_check" % (hw_num, type_string) # modify as you wish :)
+    type_string = "hw" if is_easy else "project"
+    formatted_subdir = "%02d_%s_check" % (hw_num, type_string) # modify as you wish :)
     return os.path.join(out_dir_name_root, formatted_subdir)
 
 def main(args):
