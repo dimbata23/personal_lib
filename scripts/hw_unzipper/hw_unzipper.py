@@ -7,7 +7,7 @@ Sofia University 2019-2020.
 """
 
 __author__     = "Ivan Filipov, Alexander Dimitrov"
-__version__    = "1.0.5"
+__version__    = "1.0.6"
 __maintainer__ = "Ivan Filipov, Alexander Dimitrov"
 __email__      = "vanaka11.89@gmail.com, adimitrov23@gmail.com"
 __status__     = "Production"
@@ -46,12 +46,14 @@ TOKEN_FILE       = "token.pickle"
 
 SPREADSHEET_ID = "1O4Ex9MakkeuUi6CnI5fdqG1iV9k8WESUbJqetahmpX0"
 NAMES_RANGE = "Sheet1!B204:B219"
-DATES_RANGE = "Sheet1!E200:J200"
-HW_RANGE    = "Sheet1!A5:J198"
+DATES_RANGE = "Sheet1!E200:M200"
+HW_RANGE    = "Sheet1!A5:M198"
 
 MY_NAME = "Александър Димитров" # CHANGE ME
-EASY_HW_BASE_OFFSET = 3
-HARD_HW_BASE_OFFSET = 5
+MAIN_HW_BASE_OFFSET = 3
+PROJECTS_BASE_OFFSET = 5
+PRACTICUM_BASE_OFFSET = 11
+
 
 # ------------ Google spreadsheets related ------------
 
@@ -78,6 +80,7 @@ def setup_google_drive_credits():
 
     return g_credits
 
+
 def get_my_clr(sheet):
     """Get the color of the script runner."""
     result = sheet.get(spreadsheetId=SPREADSHEET_ID,
@@ -91,6 +94,7 @@ def get_my_clr(sheet):
     print("Can't find", MY_NAME, ".\nMaybe you don't have rights to put marks?",\
            file=sys.stderr)
     sys.exit(4)
+
 
 def get_students_ids_for_hw(my_clr, sheet, hw_num, hw_row_offset):
     """From the google spreadsheet, extract only student names and ids
@@ -114,23 +118,31 @@ def get_students_ids_for_hw(my_clr, sheet, hw_num, hw_row_offset):
 
     return my_students
 
+
 def get_end_date(sheet, hw_num):
     """Extract the end datetime for that homework."""
-    result = sheet.values().get(spreadsheetId=SPREADSHEET_ID, range=DATES_RANGE).execute()
-    values = result.get('values')
-    date_string = values[0][hw_num - 1]
-    return datetime.datetime.strptime(date_string, "%d %m %Y, %H:%M")
+    try:
+        result = sheet.values().get(spreadsheetId=SPREADSHEET_ID, range=DATES_RANGE).execute()
+        values = result.get('values')
+        date_string = values[0][hw_num - 1]
+    except:
+        print("Couldn't determine hw/project end date. Make sure the end date is set on " + DATES_RANGE, file=sys.stderr)
+        sys.exit(6)
+    else:
+        return datetime.datetime.strptime(date_string, "%d %m %Y, %H:%M")
 
-def get_data_from_google_drive(hw_num, is_easy):
+
+def get_data_from_google_drive(hw_num, is_project, is_main_hw):
     """Extract all required data from the google spreadsheet."""
     g_credits = setup_google_drive_credits()
     service = discovery.build('sheets', 'v4', credentials=g_credits)
     sheet = service.spreadsheets()
     clr = get_my_clr(sheet)
-    hw_row_offset = EASY_HW_BASE_OFFSET if is_easy else HARD_HW_BASE_OFFSET
-    date_offset = hw_num if is_easy else hw_num + HARD_HW_BASE_OFFSET - EASY_HW_BASE_OFFSET
+    hw_row_offset = PROJECTS_BASE_OFFSET if is_project else (MAIN_HW_BASE_OFFSET if is_main_hw else PRACTICUM_BASE_OFFSET)
+    date_offset = hw_num + PROJECTS_BASE_OFFSET - MAIN_HW_BASE_OFFSET if is_project else (hw_num if is_main_hw else hw_num + PRACTICUM_BASE_OFFSET - MAIN_HW_BASE_OFFSET)
     return get_students_ids_for_hw(clr, sheet, hw_num, hw_row_offset),\
            get_end_date(sheet, date_offset)
+
 
 # ------------ Zip file related ------------
 
@@ -161,6 +173,7 @@ def process_single_file(out_dir, zf, file_info, name, my_students, end_date):
                           "Late with %d minutes\n" % late_with
             out_file.write(flag_string)
 
+
 def process_zip_file(filename, my_students, end_date, out_dir):
     """From the given zip file, extract the info the runner needs."""
     with zipfile.ZipFile(filename, 'r') as zip_file:
@@ -169,6 +182,7 @@ def process_zip_file(filename, my_students, end_date, out_dir):
             if name not in my_students:
                 continue
             process_single_file(out_dir, zip_file, info, name, my_students, end_date)
+
 
 # ------------ Minor helpers ------------
 
@@ -180,10 +194,12 @@ def drop_mid_name(name):
     else:
         return names[0] + ' ' + names[1]
 
+
 def ensure_dir_exists(dir_name):
     """Create a directory if it doesn't exist."""
     if not os.path.exists(dir_name):
         os.mkdir(dir_name)
+
 
 def get_hw_num_and_type_from_zip_name(zip_file_name):
     """Determinate homework number and it's type
@@ -191,11 +207,15 @@ def get_hw_num_and_type_from_zip_name(zip_file_name):
     """
     try:
         file_name = zip_file_name.lower()
-        is_easy = not "проект" in file_name
-        if not is_easy:
+        is_project = "проект" in file_name
+        is_main_hw = not is_project and not "практикум" in file_name
+        if is_project:
             hw_num = 1 if ("първия" in file_name) else (2 if ("втория" in file_name) else 0 )
-        else:
+        elif is_main_hw:
             hw_num = 1 if ("първо" in file_name) else (2 if ("второ" in file_name) else 0)
+        else:
+            hw_num = 1
+            
         if hw_num == 0:
             print("Couldn't determine hw/project number.", file=sys.stderr)
             sys.exit(5)
@@ -203,13 +223,15 @@ def get_hw_num_and_type_from_zip_name(zip_file_name):
         print(zip_file_name + " does not look like moodle's zip file.", file=sys.stderr)
         sys.exit(3)
     else:
-        return (hw_num, is_easy)
+        return (hw_num, is_project, is_main_hw)
 
-def format_output_dir_name(out_dir_name_root, hw_num, is_easy):
+
+def format_output_dir_name(out_dir_name_root, hw_num, is_project, is_main_hw):
     """Create subdirectory name from given homework number and type."""
-    type_string = "hw" if is_easy else "project"
+    type_string = "project" if is_project else ("hw" if is_main_hw else "hw_pract")
     formatted_subdir = "%02d_%s_check" % (hw_num, type_string) # modify as you wish :)
     return os.path.join(out_dir_name_root, formatted_subdir)
+
 
 def main(args):
     """Well, a simple C/C++ style main function."""
@@ -226,13 +248,14 @@ def main(args):
     ensure_dir_exists(out_dir_name_root)
 
     # extract info and prepare output direcory
-    hw_num, is_easy = get_hw_num_and_type_from_zip_name(zip_file_name)
-    out_dir = format_output_dir_name(out_dir_name_root, hw_num, is_easy)
+    hw_num, is_project, is_main_hw = get_hw_num_and_type_from_zip_name(zip_file_name)
+    out_dir = format_output_dir_name(out_dir_name_root, hw_num, is_project, is_main_hw)
     ensure_dir_exists(out_dir)
 
     # get the needed info from google spreadsheets and decompress wanted files
-    my_students, end_date = get_data_from_google_drive(hw_num, is_easy)
+    my_students, end_date = get_data_from_google_drive(hw_num, is_project, is_main_hw)
     process_zip_file(zip_file_name, my_students, end_date, out_dir)
+
 
 if __name__ == '__main__':
     main(sys.argv)
