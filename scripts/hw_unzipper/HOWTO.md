@@ -64,23 +64,27 @@
 - Запазете си файла, където си пожелаете.
 
 9. Как да пускаме скрипта:
-- **ВАЖНО: на ред 52 в скрипта сменете името с вашето, така както е изписано в общата таблица!**
+- **ВАЖНО: на ред 55 в скрипта сменете името с вашето, така както е изписано в общата таблица!**
 - Ако пуснете скрипта без параметри:
   - `$python3 hw_unzipper.py`<br>
   той ще ви изведе формата на аргументите си. Нещо такова:
   ```
-	usage: hw_unzipper.py hw_archive [out_dir]
-
-	positional arguments:
- 	hw_archive   zip file with all homeworks
-                     Notice: download it from Moodle.
-
-	optional arguments:
- 	out_dir      where to output the result
-           	     Default: The output will be save in the same
-                       directory from where the script has been run.
-                     Notice:  in this direcory a subdirectory called <hw_num>_hw_check
-                       will be created.
+    usage: hw_unzipper.py <hw_archive> [options...]  
+  
+    positional arguments:  
+    <hw_archive>   zip file with all homeworks  
+                    Notice: download it from Moodle.  
+  
+    options:  
+    -o <out_dir>   where to output the result (output directory)  
+                    Default: The output will be save in the same  
+                             directory from where the script has been run.  
+                    Notice:  in this direcory a subdirectory with an  
+                             appropriate name will be created.  
+  
+    -n             don't extract student submitted zip files.  
+                    Default: student submitted zip files will be  
+                             extracted in corresponding subdirectories.  
   ```
 - Стартирайте го с параметър пътя до изтегления от вас архив. Пример:
    - `$python3 hw_unzipper.py C443337S2-Първо\ домашно-142837.zip`
@@ -91,8 +95,12 @@
 - Също така, обърнете внимание, че може да има файл с име "*flags.txt*", там ще пише, кой файл е предаден **след** крайния срок и с колко минути закъснение.
 
 - Може да пускате скрипта и с желана от вас изходна директория. Например:
-  - `$python3 hw_unzipper.py C443337S2-Първо\ домашно-142837.zip ../out_dir`
+  - `$python3 hw_unzipper.py C443337S2-Първо\ домашно-142837.zip -o ../out_dir`
   - Тогава целия изход ще се намира в "*../out_dir/01_hw_check/*".
+
+- По подразбиране скрипта разархивира всички предадени zip файлове от студентите, което можете да спрете чрез опцията -n
+  - `$python3 hw_unzipper.py C443337S2-Първо\ домашно-142837.zip -n`
+  - Тогава предадените zip файлове няма да се разархивират.
 
 ### Размисли на автора:
 - Не се тревожете, че със скрипта ще ви открадна данните и информацията на дебитните карти :japanese_ogre:.<br> Доколкото ми е известно, скриптът не създава никакви пролуки в сигурността на профилите ви, но все пак се разграничавам от това да ви дам 100% гаранция.
