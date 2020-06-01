@@ -23,19 +23,22 @@ from google_auth_oauthlib.flow      import InstalledAppFlow
 from google.auth.transport.requests import Request
 from googleapiclient                import discovery
 
-USAGE = """usage: hw_unzipper.py hw_archive [out_dir]
+USAGE = """usage: hw_unzipper.py <hw_archive> [options...]
 
 positional arguments:
- hw_archive   zip file with all homeworks
-              Notice: download it from Moodle.
+ <hw_archive>   zip file with all homeworks
+                Notice: download it from Moodle.
 
-optional arguments:
- out_dir      where to output the result
-              Default: The output will be save in the same
-                       directory from where the script has been run.
-              Notice:  in this direcory a subdirectory
-                       called <hw_num>_hw_<easy|hard>_check
-                       will be created.
+options:
+ -o <out_dir>   where to output the result (output directory)
+                Default: The output will be save in the same
+                         directory from where the script has been run.
+                Notice:  in this direcory a subdirectory with an 
+                         appropriate name will be created.
+
+ -n             don't extract student submitted zip files.
+                Default: student submitted zip files will be
+                         extracted in corresponding subdirectories.
 """
 
 # get read only access to google spreadsheets
@@ -146,7 +149,7 @@ def get_data_from_google_drive(hw_num, is_project, is_main_hw):
 
 # ------------ Zip file related ------------
 
-def process_single_file(out_dir, zf, file_info, name, my_students, end_date):
+def process_single_file(out_dir, zf, file_info, name, my_students, end_date, extract_zip_file):
     """From the archive process a single file.
        Decompress it and move it to the student's subdirectory.
     """
@@ -163,6 +166,14 @@ def process_single_file(out_dir, zf, file_info, name, my_students, end_date):
     with open(full_file_name, "wb") as out_file:
         out_file.write(zf.read(file_info.filename))
 
+    # extract hw if it's archived by the student
+    if extract_zip_file:
+        full_name_no_ext = full_file_name.rpartition(".")[0]
+        if zipfile.is_zipfile(full_file_name):
+            with zipfile.ZipFile(full_file_name, "r") as curr_zip:
+                curr_zip.extractall(full_name_no_ext)
+            os.remove(full_file_name)
+
     # check end time
     mod_date = datetime.datetime(*file_info.date_time)
     if mod_date > end_date:
@@ -174,14 +185,14 @@ def process_single_file(out_dir, zf, file_info, name, my_students, end_date):
             out_file.write(flag_string)
 
 
-def process_zip_file(filename, my_students, end_date, out_dir):
+def process_zip_file(filename, my_students, end_date, out_dir, extract_zip_files):
     """From the given zip file, extract the info the runner needs."""
     with zipfile.ZipFile(filename, 'r') as zip_file:
         for info in zip_file.infolist():
             name = info.filename.split("_")[0]
             if name not in my_students:
                 continue
-            process_single_file(out_dir, zip_file, info, name, my_students, end_date)
+            process_single_file(out_dir, zip_file, info, name, my_students, end_date, extract_zip_files)
 
 
 # ------------ Minor helpers ------------
@@ -238,13 +249,31 @@ def main(args):
     if len(args) < 2:
         print(USAGE, file=sys.stderr)
         sys.exit(1)
+
+    extract_zip_files = True
+
     # parse arguments
     zip_file_name = args[1]
+
     if not zipfile.is_zipfile(zip_file_name):
         print(zip_file_name + " is not a valid .zip file.", file=sys.stderr)
         sys.exit(2)
 
-    out_dir_name_root = args[2] if len(args) > 2 else "./"
+    argc = len(args)
+
+    out_dir_name_root = "./"
+    i = 2
+    while i < argc:
+        if args[i] == "-o":
+            i += 1
+            out_dir_name_root = args[i]
+        elif args[i] == "-n":
+            extract_zip_files = False
+        else:
+            print("Unknown option \"" + args[i] + "\".")
+            sys.exit(7)
+        i += 1
+
     ensure_dir_exists(out_dir_name_root)
 
     # extract info and prepare output direcory
@@ -254,7 +283,7 @@ def main(args):
 
     # get the needed info from google spreadsheets and decompress wanted files
     my_students, end_date = get_data_from_google_drive(hw_num, is_project, is_main_hw)
-    process_zip_file(zip_file_name, my_students, end_date, out_dir)
+    process_zip_file(zip_file_name, my_students, end_date, out_dir, extract_zip_files)
 
 
 if __name__ == '__main__':
