@@ -170,9 +170,12 @@ def process_single_file(out_dir, zf, file_info, name, my_students, end_date, ext
     if extract_zip_file:
         full_name_no_ext = full_file_name.rpartition(".")[0]
         if zipfile.is_zipfile(full_file_name):
-            with zipfile.ZipFile(full_file_name, "r") as curr_zip:
-                curr_zip.extractall(full_name_no_ext)
-            os.remove(full_file_name)
+            try:
+                with zipfile.ZipFile(full_file_name, "r") as curr_zip:
+                    curr_zip.extractall(full_name_no_ext)
+                os.remove(full_file_name)
+            except Exception as e:
+                print("Skipping extracting file: " + full_file_name + "!\n -> Because: " + str(e))
 
     # check end time
     mod_date = datetime.datetime(*file_info.date_time)
